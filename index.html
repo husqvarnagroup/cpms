@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="style.css" />
+
+  <title>HID validation</title>
+</head>
+
+<body>
+  <div class="container">
+    <h2 class="inputTitle">Enter a HID in the textbox below</h1>
+
+    <div class="hidWrapper">
+      <div class="hidInfo">
+        <span class="infoText" style="width: 160px;" id="articleNrTxt">Article-number</span>
+        <div class="vl" id="articleNrVl"></div>
+
+        <span class="infoText" id="yearTxt">Year</span>
+        <div class="vl" id="yearVl"></div>
+
+        <span class="infoText" style="width: 160px;" id="dayTxt">Day of week, 1-7, Monday to Sunday</span>
+        <div class="vl" id="dayVl"></div>
+
+        <span class="infoText" style="width: 160px;" id="checksumTxt">Checksum</span>
+        <div class="vl" id="checksumVl"></div>
+      </div>
+      <div class="hidVisible"><span id="articleNr" class="hidPart"></span><span id="fflCode"
+          class="hidPart"></span><span id="year" class="hidPart"></span><span id="week" class="hidPart"></span><span
+          id="day" class="hidPart"></span><span id="sequenceNr" class="hidPart"></span><span id="checksum"
+          class="hidPart"></span></div>
+      <input id="hidInput" maxlength="25" />
+      <span id="successMessage" class="success" style="display: none;"><i class="fa fa-check"
+          aria-hidden="true"></i></span>
+      <div id="errorMessage" class="error" style="display: none;"></div>
+
+
+      <div class="hidInfo">
+        <span class="infoText" style="width: 160px;" id="fflCodeTxt">FFL-code</span>
+        <div class="vl" id="fflCodeVl"></div>
+
+        <span class="infoText" id="weekTxt">Week</span>
+        <div class="vl" id="weekVl"></div>
+
+        <span class="infoText" style="width: 160px;" id="sequenceNrTxt">Sequence number</span>
+        <div class="vl" id="sequenceNrVl"></div>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+
+<script>
+  initHid();
+
+  function initHid() {
+    var emptyHid = "";
+    $('#articleNr').text(emptyHid.padEnd(9, '\xa0'));
+    $('#fflCode').text(emptyHid.padEnd(3, '\xa0'));
+    $('#year').text(emptyHid.padEnd(4, '\xa0'));
+    $('#week').text(emptyHid.padEnd(2, '\xa0'));
+    $('#day').text(emptyHid.padEnd(1, '\xa0'));
+    $('#sequenceNr').text(emptyHid.padEnd(5, '\xa0'));
+    $('#checksum').text(emptyHid.padEnd(1, '\xa0'));
+
+    setDefaultColors();
+
+    setHidInfoPositions();
+
+    $('#hidInput').focus();
+  }
+
+  function setDefaultColors() {
+    $('#articleNr').css("color", "lightgray");
+    $('#fflCode').css("color", "lightgray");
+    $('#year').css("color", "lightgray");
+    $('#week').css("color", "lightgray");
+    $('#day').css("color", "lightgray");
+    $('#sequenceNr').css("color", "lightgray");
+    $('#checksum').css("color", "lightgray");
+
+    $('#articleNrTxt').css("color", "lightgray");
+    $('#fflCodeTxt').css("color", "lightgray");
+    $('#yearTxt').css("color", "lightgray");
+    $('#weekTxt').css("color", "lightgray");
+    $('#dayTxt').css("color", "lightgray");
+    $('#sequenceNrTxt').css("color", "lightgray");
+    $('#checksumTxt').css("color", "lightgray");
+
+    $('#articleNrVl').css("border-color", "lightgray");
+    $('#fflCodeVl').css("border-color", "lightgray");
+    $('#yearVl').css("border-color", "lightgray");
+    $('#weekVl').css("border-color", "lightgray");
+    $('#dayVl').css("border-color", "lightgray");
+    $('#sequenceNrVl').css("border-color", "lightgray");
+    $('#checksumVl').css("border-color", "lightgray");
+  }
+
+  $(window).on('resize', function (e) {
+    setHidInfoPositions();
+  });
+
+  $('#hidInput').on('input', function (e) {
+    const hid = $('#hidInput').val();
+
+    if (hid.length === 0 || hid === undefined) {
+      initHid();
+      $('#errorMessage').hide();
+      $('#successMessage').hide();
+      return;
+    }
+
+    var articleNr = hid.substring(0, 9).padEnd(9, '\xa0');
+    var fflCode = hid.substring(9, 12).padEnd(3, '\xa0');
+    var year = hid.substring(12, 16).padEnd(4, '\xa0');
+    var week = hid.substring(16, 18).padEnd(2, '\xa0');
+    var day = hid.substring(18, 19).padEnd(1, '\xa0');
+    var sequenceNr = hid.substring(19, 24).padEnd(5, '\xa0');
+    var checksum = hid.substring(24, 25).padEnd(1, '\xa0');
+
+    setDefaultColors();
+
+    $('#articleNr').text(articleNr);
+    $('#fflCode').text(fflCode);
+    $('#year').text(year);
+    $('#week').text(week);
+    $('#day').text(day);
+    $('#sequenceNr').text(sequenceNr);
+    $('#checksum').text(checksum);
+
+    var hidValid = isHidValid(hid);
+
+    if (!hidValid) {
+      $('#errorMessage').show();
+      $('#successMessage').hide();
+    }
+    else {
+      $('#errorMessage').hide();
+      $('#successMessage').show();
+    }
+
+    setHidInfoPositions();
+  });
+
+  function GetNumericValue(char) {
+    if(/^\d+$/.test(char)) {
+      return char
+    }
+
+    return char.charCodeAt(0) - 55
+  }
+
+  function hasValidChecksum(value) {
+
+    if (value.length < 24) {
+      return false;
+    }
+
+    let checksum = 0;
+
+    for (let i = 0; i < 24; i++) {
+      checksum += GetNumericValue(value[i]) * (i % 2 == 0 ? 1 : 3);
+    }
+
+    let mod = checksum % 10;
+    let crc = mod == 0 ? 0 : 10 - mod
+    let expected = value.charCodeAt(24) - 48;
+    return crc == expected;
+  }
+
+  function isHidValid(hid) {
+
+    var articleNrValid = /^\d{9}$/.test(hid.substring(0, 9));
+    var fflCodeValid = /^([A-Z0-9]{3})$/.test(hid.substring(9, 12));
+    var yearValid = /^([2-9][0-9]{3})$/.test(hid.substring(12, 16));
+    var weekValid = /^([0-4][0-9]|5[0-3])$/.test(hid.substring(16, 18));
+    var dayValid = /^[1-7]$/.test(hid.substring(18, 19));
+    var sequenceNrValid = /^\d{5}$/.test(hid.substring(19, 24));
+    var checksumValid = /^[1-9]$/.test(hid.substring(24,25));
+    var checksumOk = hasValidChecksum(hid);
+
+    let errorMessage = "Invalid HID: ";
+    if (!articleNrValid) {
+      errorMessage += "Article number should contain 9 numbers.";
+      $('#articleNr').css("color", "red");
+      $('#articleNrTxt').css("color", "red");
+      $('#articleNrVl').css("border-color", "red");
+      $('#errorMessage').html(errorMessage);
+      return false;
+    }
+    $('#articleNr').css("color", "blue");
+    $('#articleNrTxt').css("color", "blue");
+    $('#articleNrVl').css("border-color", "blue");
+
+    if (!fflCodeValid) {
+      errorMessage += "Production line id should contain 3 characters.";
+      $('#fflCode').css("color", "red");
+      $('#fflCodeTxt').css("color", "red");
+      $('#fflCodeVl').css("border-color", "red");
+      $('#errorMessage').html(errorMessage);
+      return false;
+    }
+    $('#fflCode').css("color", "orange");
+    $('#fflCodeTxt').css("color", "orange");
+    $('#fflCodeVl').css("border-color", "orange");
+
+    if (!yearValid) {
+      errorMessage += "Year should be a number over 2000 and below 5000.";
+      $('#year').css("color", "red");
+      $('#yearTxt').css("color", "red");
+      $('#yearVl').css("border-color", "red");
+      $('#errorMessage').html(errorMessage);
+      return false;
+    }
+    $('#year').css("color", "rgb(255, 217, 0)");
+    $('#yearTxt').css("color", "rgb(255, 217, 0)");
+    $('#yearVl').css("border-color", "rgb(255, 217, 0)");
+
+    if (!weekValid) {
+      errorMessage += "Week should be a number from 1 to 53.";
+      $('#week').css("color", "red");
+      $('#weekTxt').css("color", "red");
+      $('#weekVl').css("border-color", "red");
+      $('#errorMessage').html(errorMessage);
+      return false;
+    }
+    $('#week').css("color", "skyblue");
+    $('#weekTxt').css("color", "skyblue");
+    $('#weekVl').css("border-color", "skyblue");
+
+    if (!dayValid) {
+      errorMessage += "Day should be a number from 1 to 7.";
+      $('#day').css("color", "red");
+      $('#dayTxt').css("color", "red");
+      $('#dayVl').css("border-color", "red");
+      $('#errorMessage').html(errorMessage);
+      return false;
+    }
+    $('#day').css("color", "green");
+    $('#dayTxt').css("color", "green");
+    $('#dayVl').css("border-color", "green");
+
+    if (!sequenceNrValid) {
+      errorMessage += "Sequence number should a 5 digit number.";
+      $('#sequenceNr').css("color", "red");
+      $('#sequenceNrTxt').css("color", "red");
+      $('#sequenceNrVl').css("border-color", "red");
+      $('#errorMessage').html(errorMessage);
+      return false;
+    }
+    $('#sequenceNr').css("color", "purple");
+    $('#sequenceNrTxt').css("color", "purple");
+    $('#sequenceNrVl').css("border-color", "purple");
+
+    if (!checksumValid) {
+      errorMessage += "Checksum should be a single number.";
+      $('#checksum').css("color", "red");
+      $('#checksumTxt').css("color", "red");
+      $('#checksumVl').css("border-color", "red");
+      $('#errorMessage').html(errorMessage);
+      return false;
+    }
+
+    if (!checksumOk) {
+      errorMessage += "Checksum not valid.";
+      $('#checksum').css("color", "red");
+      $('#checksumTxt').css("color", "red");
+      $('#checksumVl').css("border-color", "red");
+      $('#errorMessage').html(errorMessage);
+      return false;
+    }
+
+    return true;
+  }
+
+
+  function setHidInfoPositions() {
+    var articleNrPosition = $('#articleNr').position();
+    var articleNrTextWidth = $('#articleNrTxt').width();
+    var articleNrWidth = $('#articleNr').width();
+    var articleNrPosDiff = (articleNrTextWidth - articleNrWidth) / 2;
+    $('#articleNrTxt').css({ position: "absolute", top: articleNrPosition.top - 70, left: articleNrPosition.left - articleNrPosDiff });
+    $('#articleNrVl').css({ position: "absolute", top: articleNrPosition.top - 50, left: articleNrPosition.left + articleNrWidth / 2, height: 50 });
+
+    var yearPosition = $('#year').position();
+    var yearTextWidth = $('#yearTxt').width();
+    var yearWidth = $('#year').width();
+    var yearPosDiff = (yearTextWidth - yearWidth) / 2;
+    $('#yearTxt').css({ position: "absolute", top: yearPosition.top - 40, left: yearPosition.left - yearPosDiff });
+    $('#yearVl').css({ position: "absolute", top: yearPosition.top - 20, left: yearPosition.left + yearWidth / 2, height: 20 });
+
+    var dayPosition = $('#day').position();
+    var dayTextWidth = $('#dayTxt').width();
+    var dayWidth = $('#day').width();
+    var dayPosDiff = (dayTextWidth - dayWidth) / 2;
+    $('#dayTxt').css({ position: "absolute", top: dayPosition.top - 110, left: dayPosition.left - dayPosDiff });
+    $('#dayVl').css({ position: "absolute", top: dayPosition.top - 70, left: dayPosition.left + dayWidth / 2, height: 70 });
+
+    var checksumPosition = $('#checksum').position();
+    var checksumTextWidth = $('#checksumTxt').width();
+    var checksumWidth = $('#checksum').width();
+    var checksumPosDiff = (checksumTextWidth - checksumWidth) / 2;
+    $('#checksumTxt').css({ position: "absolute", top: checksumPosition.top - 50, left: checksumPosition.left - checksumPosDiff });
+    $('#checksumVl').css({ position: "absolute", top: checksumPosition.top - 30, left: checksumPosition.left + checksumWidth / 2, height: 30 });
+
+
+
+    var fflCodePosition = $('#fflCode').position();
+    var fflCodeTextWidth = $('#fflCodeTxt').width();
+    var fflCodeWidth = $('#fflCode').width();
+    var fflCodePosDiff = (fflCodeTextWidth - fflCodeWidth) / 2;
+    $('#fflCodeTxt').css({ position: "absolute", top: fflCodePosition.top + 80, left: fflCodePosition.left - fflCodePosDiff });
+    $('#fflCodeVl').css({ position: "absolute", top: fflCodePosition.top - 1, left: fflCodePosition.left + fflCodeWidth / 2, height: 80 });
+
+    var weekPosition = $('#week').position();
+    var weekTextWidth = $('#weekTxt').width();
+    var weekWidth = $('#week').width();
+    var weekPosDiff = (weekTextWidth - weekWidth) / 2;
+    $('#weekTxt').css({ position: "absolute", top: weekPosition.top + 40, left: weekPosition.left - weekPosDiff });
+    $('#weekVl').css({ position: "absolute", top: weekPosition.top - 1, left: weekPosition.left + weekWidth / 2, height: 40 });
+
+    var sequenceNrPosition = $('#sequenceNr').position();
+    var sequenceNrTextWidth = $('#sequenceNrTxt').width();
+    var sequenceNrWidth = $('#sequenceNr').width();
+    var sequenceNrPosDiff = (sequenceNrTextWidth - sequenceNrWidth) / 2;
+    $('#sequenceNrTxt').css({ position: "absolute", top: sequenceNrPosition.top + 100, left: sequenceNrPosition.left - sequenceNrPosDiff });
+    $('#sequenceNrVl').css({ position: "absolute", top: sequenceNrPosition.top - 1, left: sequenceNrPosition.left + sequenceNrWidth / 2, height: 100 });
+  }
+
+</script>
+
+</html>
